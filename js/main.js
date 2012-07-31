@@ -1,12 +1,24 @@
-//Put pieces in a grid when they land
+
+// Array Remove - By John Resig (MIT Licensed)
+Array.prototype.remove = function(from, to) {
+  var rest = this.slice((to || from) + 1 || this.length);
+  this.length = from < 0 ? this.length + from : from;
+  return this.push.apply(this, rest);
+};
+
 
 var base = {
 	'refresh_rate': 1000,
 	'colors': {
 		'red': 'rgb(200,0,0)',
-		'blue': 'rgb(17, 100, 204)'
+		'blue': 'rgb(17, 100, 204)',
+		'green': 'rgb(9, 150, 16)'
 	},
-	'square': 30, 
+	'square': 30,
+	'active_piece': null,
+	'ctx': null,
+	'grid_size': [10, 16],
+	'grid': [], 
 	'available_piece_types': {
 		'long': [
 			[
@@ -45,7 +57,7 @@ var base = {
 				[0, 0],
 				[1, 0],
 				[2, 0],
-				[0, 1]
+				[2, 1]
 			]
 		],
 		'l': [
@@ -138,7 +150,132 @@ var base = {
 			]
 		]
 	},
-	'piece_dimensions': function(type, rotation) {
+	'init': function() {
+		
+		this._get_canvas();
+		this._init_grid();
+		
+		//DEBUG BELOW
+		//this._new_piece();
+		//this.progress();
+	},
+	'start': function () {
+		
+		this._new_piece();
+		this.interval = setInterval(base.progress, this.refresh_rate);
+	},
+	'progress': function() {
+
+		var last_active_piece_position = base.active_piece;
+
+		base._clear_active_piece();
+		base._draw_piece(last_active_piece_position.type, last_active_piece_position.x, last_active_piece_position.y+1, last_active_piece_position.rotation);
+
+		base._add_piece_to_grid();
+		base._draw_grid();
+		
+	},
+	'rotate_piece': function() {
+		
+		var next_rotation = base.active_piece.rotation + 1;
+		if(next_rotation == base.available_piece_types[base.active_piece.type].length) {
+			next_rotation = 0;
+		}
+		
+		//Case where a rotation will put a piece off screen
+		var new_x = base.active_piece.x;
+		if(base._piece_dimensions(base.active_piece.type, next_rotation).x + base.active_piece.x > base.grid_size[0]) {
+			new_x = new_x - 1;
+		}
+		
+		var last_active_piece_position = base.active_piece;
+		base._clear_active_piece();
+		base._draw_piece(last_active_piece_position.type, new_x, last_active_piece_position.y, next_rotation);
+		
+		this._draw_grid();
+	},
+	'move_piece': function(direction) {
+		
+		var offset = -1;
+		if(direction == 'right') {
+			offset = 1;
+		}
+		
+		//Check for grid edges
+		var in_grid = false;
+		if((this.active_piece.x + offset >= 0) && (this.active_piece.x + base._piece_dimensions(this.active_piece.type, this.active_piece.rotation).x + offset <= this.grid_size[0])) {
+			in_grid = true;
+		}
+		
+		//Determine rows to check
+		var piece_dimensions = this._piece_dimensions(this.active_piece.type, this.active_piece.rotation);
+		var rows_to_check = [];
+		var c = this.active_piece.y;
+		while(c < (this.active_piece.y + piece_dimensions.y)) {
+			rows_to_check.push(c);
+			c++;
+		}
+		
+		//Create parallel arrays with how many blocks on the left and right to look over when moving
+		var spaces_left_to_check = [10,10,10,10];
+		var spaces_right_to_check = [0,0,0,0];
+		
+		//Loop based on height looking at how far over on each side a piece is
+		for(var i = 0;i<piece_dimensions.y;i++) {
+			
+			//Look through block pattern
+			var rotation = this.available_piece_types[this.active_piece.type][this.active_piece.rotation];
+			for(var j = 0;j<rotation.length;j++) {
+				var distance_right = rotation[j][0] + 1;
+				var distance_left = rotation[j][0] + 1;
+				
+				//Set spaces right to check
+				if(rotation[j][1]==i && distance_right > spaces_right_to_check[i]) {
+					spaces_right_to_check[i] = distance_right;
+				}
+				
+				//Set spaces left to check
+				if(rotation[j][1]==i && distance_left < spaces_left_to_check[i]) {
+					spaces_left_to_check[i] = distance_left;
+				}
+			}
+		}
+
+		//Detect blocks in the way of our move
+		var valid = true;
+		if(in_grid) {
+			for(var i = 0;i<rows_to_check.length;i++) {
+				//console.log(rows_to_check[i]);//VALID
+				//console.log(spaces_right_to_check[i]); //VALID
+				//console.log(spaces_left_to_check); //VALID, but look
+				//console.log(this.active_piece.x); //VALID
+
+				//Working
+				if(direction=='right') {
+					if(this.grid[this.active_piece.x + spaces_right_to_check[i]][this.active_piece.y + i]) {
+						valid = false;
+					}
+				}
+				else {
+					if(this.active_piece.x - spaces_left_to_check[i] > 0) {
+						if(this.grid[this.active_piece.x - spaces_left_to_check[i]][this.active_piece.y + i]) {
+							valid = false;
+						}
+					}
+				}
+			}
+		}
+
+		//Legal Move
+		if(valid && in_grid) {
+			var last_active_piece_position = base.active_piece;
+			base._clear_active_piece();
+			this._draw_piece(last_active_piece_position.type, last_active_piece_position.x + offset, last_active_piece_position.y, last_active_piece_position.rotation);
+		}
+		
+		this._draw_grid();
+	},
+	'_piece_dimensions': function(type, rotation) {
 		
 		var blocks = this.available_piece_types[type][rotation];
 		var dimensions = {x: 0, y: 0};
@@ -156,45 +293,24 @@ var base = {
 		
 		return dimensions;
 	},
-	
-	'active_piece': null,
-	'ctx': null,
-	'grid_size': [10, 16],
-	'init': function() {
-		this.get_canvas();
-		this.init_grid();
-		this.new_piece();
-		this.add_piece_to_grid();
-	},
-	'get_canvas' : function() {
+	'_get_canvas' : function() {
+		
 		this.ctx = document.getElementById('grid').getContext('2d');
 	},
-	'start': function () {
-		this.interval = setInterval(base.progress, this.refresh_rate);
-	},
-	'random_piece_key': function() {
+	'_random_piece_key': function() {
+		
 		var keys = []
 		for(var key in this.available_piece_types) {
 			keys.push(key);
 		}
 		return keys[Math.floor(Math.random()*keys.length)];
 	},
-	'new_piece': function() {
+	'_new_piece': function() {
 
 		var new_x = Math.floor(Math.random()*(this.grid_size[0]-3)+1);
-		this.draw_piece(this.random_piece_key(), new_x, 0, 0);
+		this._draw_piece(this._random_piece_key(), new_x, 0, 0);
 	},
-	'progress': function() {
-
-		var last_active_piece_position = base.active_piece;
-
-		base.clear_active_piece();
-		base.draw_piece(last_active_piece_position.type, last_active_piece_position.x, last_active_piece_position.y+1, last_active_piece_position.rotation);
-
-		base.add_piece_to_grid();
-		base.draw_grid();
-	},
-	'init_grid': function() {
+	'_init_grid': function() {
 		
 		for(var i = 0;i<this.grid_size[0];i++) {
 			this.grid.push([]);
@@ -202,31 +318,32 @@ var base = {
 				this.grid[i].push(false);
 				//Add one more and make it true to make the bottom of the screen
 				if(j+1 == this.grid_size[1]) {
-					console.log('LAST');
 					this.grid[i].push(true);
 				}
 			}
 		}
-		
-		this.draw_grid();
 	},
-	'draw_grid': function() {
+	'_draw_grid': function() {
+
+		this._check_for_complete_rows();
 
 		this.ctx.fillStyle = this.colors.blue;
 
 		for(var i = 0;i<this.grid.length;i++) {
 			for(var j = 0;j<this.grid[i].length;j++) {
+				
+				this.ctx.strokeStyle = this.colors.red
+				this.ctx.strokeRect(i*this.square, j*this.square, this.square, this.square);
+				
 				if(this.grid[i][j]) {
 					this.ctx.fillRect(i*this.square, j*this.square, this.square, this.square);
 				}
 			}
 		}
 	},
-	'grid': [],
-	'add_piece_to_grid': function() {
+	'_add_piece_to_grid': function() {
 		//Detect if the piece should be added to the grid
-		
-		var piece_dimensions = this.piece_dimensions(this.active_piece.type, this.active_piece.rotation);
+		var piece_dimensions = this._piece_dimensions(this.active_piece.type, this.active_piece.rotation);
 
 		//Determine columns to check
 		var columns_to_check = [];
@@ -235,7 +352,6 @@ var base = {
 			columns_to_check.push(c);
 			c++;
 		}
-		console.log(columns_to_check);
 		
 		//Create parallel array with how many blocks down to count on each column based on it shape
 		var spaces_down_to_check = [0,0,0];
@@ -251,9 +367,8 @@ var base = {
 				}
 			}
 		}		
-		console.log(spaces_down_to_check);
 		
-		//Detect a hit
+		//Detect a vertical hit
 		var hit = false;
 		for(var i = 0;i<columns_to_check.length;i++) {
 			var column = this.grid[columns_to_check[i]];
@@ -265,18 +380,17 @@ var base = {
 				for(var j = 0;j<piece_shape.length;j++) {
 					this.grid[this.active_piece.x + piece_shape[j][0]][this.active_piece.y + piece_shape[j][1]] = true;
 				}
-				this.clear_active_piece();
-				this.new_piece();
+				this._clear_active_piece();
+				this._new_piece();
 			}
 		}
-		
-		
 	},
-	'clear_active_piece': function() {
-		this.ctx.clearRect(0,0,600,600);
+	'_clear_active_piece': function() {
+		this.ctx.clearRect(0,0,300,480);
 		this.active_piece = null;
 	},
-	'draw_piece': function(piece_type, x_grid_offset, y_grid_offset, rotation) {
+	'_draw_piece': function(piece_type, x_grid_offset, y_grid_offset, rotation) {
+		
 		this.ctx.fillStyle = this.colors.red;
 		
 		//Track our piece
@@ -290,46 +404,98 @@ var base = {
 			var square = this.available_piece_types[piece_type][rotation][i];
 			this.ctx.fillRect(square[0]*this.square + this.square*x_grid_offset, square[1]*this.square + this.square*y_grid_offset, this.square, this.square);
 		}
-		
 	},
-	'rotate_piece': function() {
-		
-		
-		
-		var next_rotation = base.active_piece.rotation + 1;
-		if(next_rotation == base.available_piece_types[base.active_piece.type].length) {
-			next_rotation = 0;
+	'_check_for_complete_rows': function() {
+
+		var complete_rows = []
+
+		//Check for complete rows
+		for(var i = 0;i<this.grid[0].length-1;i++) {
+			var complete = true;
+			for(var j = 0;j<this.grid.length;j++) {
+				if(!this.grid[j][i]) {
+					complete = false;
+				}
+			}
+			if(complete) {
+				complete_rows.push(i);
+			}
 		}
 		
-		//Case where a rotation will put a piece off screen
-		var new_x = base.active_piece.x;
-		if(base.piece_dimensions(base.active_piece.type, next_rotation).x + base.active_piece.x > base.grid_size[0]) {
-			new_x = new_x - 1;
+		//Process them
+		for(var i = 0;i<complete_rows.length;i++) {
+			//Clear rows
+			for(var j = 0;j<this.grid.length;j++) {
+				this.grid[j][complete_rows[i]] = false;
+			}
+
+			//Light up row
+			this.ctx.fillStyle = this.colors.green;
+			this.ctx.fillRect(0, complete_rows[i]*this.square, this.square*this.grid_size[0], this.square);
 		}
 		
-		var last_active_piece_position = base.active_piece;
-		base.clear_active_piece();
-		base.draw_piece(last_active_piece_position.type, new_x, last_active_piece_position.y, next_rotation);
+		//Remove Rows
+		var rows_to_remove = complete_rows.length;
+		while(complete_rows.length > 0) {
+			this.grid.remove(complete_rows[0]);
+			complete_rows.remove(0);
+			
+			console.log('REMOVING ROW');
+		}
+		console.log(this.grid);
 		
-		this.draw_grid();
-	},
-	'move_piece': function(direction) {
-		
-		var offset = -1;
-		if(direction == 'right') {
-			offset = 1;
+		//Add in new rows up top
+		var row = []
+		for(var i = 0;i<this.grid_size[1];i++) {
+			row.push(false);
+		}
+		row.push(true);
+		for(var i = 0;i<rows_to_remove;i++) {
+			this.grid.unshift(row);
 		}
 		
-		if((this.active_piece.x + offset >= 0) && (this.active_piece.x + base.piece_dimensions(this.active_piece.type, this.active_piece.rotation).x + offset <= this.grid_size[0])) {
-			var last_active_piece_position = base.active_piece;
-			base.clear_active_piece();
-			this.draw_piece(last_active_piece_position.type, last_active_piece_position.x + offset, last_active_piece_position.y, last_active_piece_position.rotation);
-		}
-		this.draw_grid();
-	},
-	'render': function() {
 		
+		/*
+		//Shift everything down
+		var new_grid = [];
+		
+		while(complete_rows.length > 0) {
+			
+			var complete_row = complete_rows[0];
+			//Start at the top and shift everything down until
+			for(var i = 0;i<this.grid[0].length-1;i++) {
 				
+				//Shift
+				if(i < complete_row) {
+					console.log(i);
+					var new_row = [];
+					for(var j = 0;j<this.grid.length;j++) {
+						new_row.push(this.grid[j][i+1]);
+					}
+					new_grid.push(new_row);
+				}
+				
+		
+				else if(i == complete_row) {
+					
+				}
+				else {
+					var new_row = [];
+					for(var j = 0;j<this.grid.length;j++) {
+						new_row.push(this.grid[j][i]);
+					}
+					new_grid.push(new_row);
+				}
+		
+			}
+			this.grid = new_grid;
+			complete_rows.remove(0);
+		}
+		*/
+		
+			//Move everything above completed row down one
+			//Remove this completed row
+			
 	}
 }
 
