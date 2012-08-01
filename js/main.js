@@ -18,7 +18,8 @@ var base = {
 	'active_piece': null,
 	'ctx': null,
 	'grid_size': [10, 16],
-	'grid': [], 
+	'grid': [],
+	'complete_rows': [], 
 	'available_piece_types': {
 		'long': [
 			[
@@ -166,6 +167,7 @@ var base = {
 	},
 	'progress': function() {
 
+
 		var last_active_piece_position = base.active_piece;
 
 		base._clear_active_piece();
@@ -173,7 +175,7 @@ var base = {
 
 		base._add_piece_to_grid();
 		base._draw_grid();
-		
+
 	},
 	'rotate_piece': function() {
 		
@@ -374,7 +376,7 @@ var base = {
 			var column = this.grid[columns_to_check[i]];
 			//Hit or bottom
 			if((column[this.active_piece.y + spaces_down_to_check[i]])) {
-				
+				//console.log(this.grid);
 				//Add piece to grid
 				var piece_shape = this.available_piece_types[this.active_piece.type][this.active_piece.rotation];
 				for(var j = 0;j<piece_shape.length;j++) {
@@ -407,9 +409,53 @@ var base = {
 	},
 	'_check_for_complete_rows': function() {
 
-		var complete_rows = []
+		//Remove complete rows
+		if(this.complete_rows.length > 0) {
 
-		//Check for complete rows
+			
+			
+			
+			
+			//Transform the grid to have rows before columns (y before x)
+			var new_grid = [];
+			for(var i = 0;i<this.grid[0].length;i++) {
+				var new_row = []
+				for(var j = 0;j<this.grid.length;j++) {
+					
+					new_row.push(this.grid[j][i]);
+				}				
+				new_grid.push(new_row);
+			}
+
+			
+		
+			//Remove Rows
+			for(var i = 0;i<this.complete_rows.length;i++) {
+				console.log('REMOVE' + this.complete_rows[i]);
+				new_grid.remove(this.complete_rows[i]);
+			}
+			
+			//Add in new rows up top
+			var row = []
+			for(var i = 0;i<new_grid[0].length;i++) {
+				row.push(false);
+			}
+			for(var i = 0;i<this.complete_rows.length;i++) {
+				new_grid.unshift(row);
+			}
+	
+			//Convert back to normal grid (x before y)
+			for(var i = 0;i < new_grid[0].length;i++) {
+				for(var j = 0;j < new_grid.length;j++) {
+					this.grid[i][j] = new_grid[j][i];
+				}
+			}
+			
+			//Reset
+			this.complete_rows = [];
+		}
+		
+		//Check for complete rows (ignore row below bottom line)
 		for(var i = 0;i<this.grid[0].length-1;i++) {
 			var complete = true;
 			for(var j = 0;j<this.grid.length;j++) {
@@ -418,84 +464,25 @@ var base = {
 				}
 			}
 			if(complete) {
-				complete_rows.push(i);
+				this.complete_rows.push(i);
 			}
 		}
 		
 		//Process them
-		for(var i = 0;i<complete_rows.length;i++) {
+		for(var i = 0;i<this.complete_rows.length;i++) {
+		
+			//THIS IS THE ERROR
+			/*
 			//Clear rows
 			for(var j = 0;j<this.grid.length;j++) {
-				this.grid[j][complete_rows[i]] = false;
-			}
+				this.grid[j][this.complete_rows[i]] = false;
+			}*/
 
 			//Light up row
 			this.ctx.fillStyle = this.colors.green;
-			this.ctx.fillRect(0, complete_rows[i]*this.square, this.square*this.grid_size[0], this.square);
+			this.ctx.fillRect(0, this.complete_rows[i]*this.square, this.square*this.grid_size[0], this.square);
 		}
 		
-		//Remove Rows
-		var rows_to_remove = complete_rows.length;
-		while(complete_rows.length > 0) {
-			this.grid.remove(complete_rows[0]);
-			complete_rows.remove(0);
-			
-			console.log('REMOVING ROW');
-		}
-		console.log(this.grid);
-		
-		//Add in new rows up top
-		var row = []
-		for(var i = 0;i<this.grid_size[1];i++) {
-			row.push(false);
-		}
-		row.push(true);
-		for(var i = 0;i<rows_to_remove;i++) {
-			this.grid.unshift(row);
-		}
-		
-		
-		/*
-		//Shift everything down
-		var new_grid = [];
-		
-		while(complete_rows.length > 0) {
-			
-			var complete_row = complete_rows[0];
-			//Start at the top and shift everything down until
-			for(var i = 0;i<this.grid[0].length-1;i++) {
-				
-				//Shift
-				if(i < complete_row) {
-					console.log(i);
-					var new_row = [];
-					for(var j = 0;j<this.grid.length;j++) {
-						new_row.push(this.grid[j][i+1]);
-					}
-					new_grid.push(new_row);
-				}
-				
-		
-				else if(i == complete_row) {
-					
-				}
-				else {
-					var new_row = [];
-					for(var j = 0;j<this.grid.length;j++) {
-						new_row.push(this.grid[j][i]);
-					}
-					new_grid.push(new_row);
-				}
-		
-			}
-			this.grid = new_grid;
-			complete_rows.remove(0);
-		}
-		*/
-		
-			//Move everything above completed row down one
-			//Remove this completed row
-			
 	}
 }
 
