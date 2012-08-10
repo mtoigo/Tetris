@@ -15,6 +15,7 @@ var base = {
 		'green': 'rgb(9, 150, 16)'
 	},
 	'square': 30,
+	'key_hold': false,
 	'active_piece': null,
 	'ctx': null,
 	'grid_size': [10, 16],
@@ -167,11 +168,15 @@ var base = {
 	},
 	'progress': function() {
 
-
 		var last_active_piece_position = base.active_piece;
 
 		base._clear_active_piece();
 		base._draw_piece(last_active_piece_position.type, last_active_piece_position.x, last_active_piece_position.y+1, last_active_piece_position.rotation);
+
+		//TODO - messing with normal movement
+		if(base.key_hold) {
+			base.move_piece(base.key_hold);
+		}
 
 		base._add_piece_to_grid();
 		base._draw_grid();
@@ -193,7 +198,8 @@ var base = {
 		var last_active_piece_position = base.active_piece;
 		base._clear_active_piece();
 		base._draw_piece(last_active_piece_position.type, new_x, last_active_piece_position.y, next_rotation);
-		
+
+		this._add_piece_to_grid();
 		this._draw_grid();
 	},
 	'move_piece': function(direction) {
@@ -247,11 +253,6 @@ var base = {
 		var valid = true;
 		if(in_grid) {
 			for(var i = 0;i<rows_to_check.length;i++) {
-				//console.log(rows_to_check[i]);//VALID
-				//console.log(spaces_right_to_check[i]); //VALID
-				//console.log(spaces_left_to_check); //VALID, but look
-				//console.log(this.active_piece.x); //VALID
-
 				//Working
 				if(direction=='right') {
 					if(this.grid[this.active_piece.x + spaces_right_to_check[i]][this.active_piece.y + i]) {
@@ -344,6 +345,7 @@ var base = {
 		}
 	},
 	'_add_piece_to_grid': function() {
+		
 		//Detect if the piece should be added to the grid
 		var piece_dimensions = this._piece_dimensions(this.active_piece.type, this.active_piece.rotation);
 
@@ -412,10 +414,6 @@ var base = {
 		//Remove complete rows
 		if(this.complete_rows.length > 0) {
 
-			
-			
-			
-			
 			//Transform the grid to have rows before columns (y before x)
 			var new_grid = [];
 			for(var i = 0;i<this.grid[0].length;i++) {
@@ -426,22 +424,18 @@ var base = {
 				}				
 				new_grid.push(new_row);
 			}
-
 			
-		
-			//Remove Rows
+			//Fresh Empty Row
+			var new_row = []
+			for(var i = 0;i<new_grid[0].length;i++) {
+				new_row.push(false);
+			}
+
+			//Remove Rows and Add Empty Ones Up Top
 			for(var i = 0;i<this.complete_rows.length;i++) {
 				console.log('REMOVE' + this.complete_rows[i]);
 				new_grid.remove(this.complete_rows[i]);
-			}
-			
-			//Add in new rows up top
-			var row = []
-			for(var i = 0;i<new_grid[0].length;i++) {
-				row.push(false);
-			}
-			for(var i = 0;i<this.complete_rows.length;i++) {
-				new_grid.unshift(row);
+				new_grid.unshift(new_row);
 			}
 	
 			//Convert back to normal grid (x before y)
@@ -451,11 +445,15 @@ var base = {
 				}
 			}
 			
+			console.log(this.grid);
+			
 			//Reset
 			this.complete_rows = [];
 		}
 		
+		//console.log(this.grid);
 		//Check for complete rows (ignore row below bottom line)
+		//console.log(this.grid[0].length);
 		for(var i = 0;i<this.grid[0].length-1;i++) {
 			var complete = true;
 			for(var j = 0;j<this.grid.length;j++) {
@@ -463,6 +461,7 @@ var base = {
 					complete = false;
 				}
 			}
+			//Ignore our bottom most row
 			if(complete) {
 				this.complete_rows.push(i);
 			}
@@ -470,13 +469,11 @@ var base = {
 		
 		//Process them
 		for(var i = 0;i<this.complete_rows.length;i++) {
-		
-			//THIS IS THE ERROR
-			/*
+			
 			//Clear rows
 			for(var j = 0;j<this.grid.length;j++) {
 				this.grid[j][this.complete_rows[i]] = false;
-			}*/
+			}
 
 			//Light up row
 			this.ctx.fillStyle = this.colors.green;
@@ -502,15 +499,21 @@ $(document).ready(function() {
 			//Left
 			case 37:
 				base.move_piece('left');
+				base.key_hold = 'left';
 			break;
 			//Right
 			case 39:
 				base.move_piece('right');
+				base.key_hold = 'right';
 			break;
 			//Down
 			case 40:
 				base.progress();
 		}
+	});
+
+	$(window).bind('keyup', function(e) {
+		base.key_hold = false
 	});
 });
 
