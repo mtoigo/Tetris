@@ -8,7 +8,6 @@ Array.prototype.remove = function(from, to) {
 
 
 var base = {
-	'refresh_rate': 1000,
 	'colors': {
 		'red': 'rgb(200,0,0)',
 		'blue': 'rgb(17, 100, 204)',
@@ -20,7 +19,15 @@ var base = {
 	'ctx': null,
 	'grid_size': [10, 16],
 	'grid': [],
-	'complete_rows': [], 
+	'complete_rows': [],
+	'lines_per_level': 10,
+	'initial_speed': 1000,
+	'level_speed_increase': 100,
+	'status': {
+		'score': 0,
+		'lines': 0,
+		'level': 0
+	},
 	'available_piece_types': {
 		'long': [
 			[
@@ -163,8 +170,8 @@ var base = {
 	},
 	'start': function () {
 		
-		this._new_piece();
-		this.interval = setInterval(base.progress, this.refresh_rate);
+		base._new_piece();
+		base.interval = setInterval(base.progress, base.initial_speed);
 	},
 	'progress': function() {
 
@@ -177,10 +184,16 @@ var base = {
 		if(base.key_hold) {
 			base.move_piece(base.key_hold);
 		}
-
+		
 		base._add_piece_to_grid();
 		base._draw_grid();
-
+		
+		base._update_status();
+	},
+	'_update_status': function() {
+		$('#score').html(this.status.score);
+		$('#lines').html(this.status.lines);
+		$('#level').html(this.status.level);
 	},
 	'rotate_piece': function() {
 		
@@ -276,6 +289,7 @@ var base = {
 			this._draw_piece(last_active_piece_position.type, last_active_piece_position.x + offset, last_active_piece_position.y, last_active_piece_position.rotation);
 		}
 		
+		this._add_piece_to_grid();
 		this._draw_grid();
 	},
 	'_piece_dimensions': function(type, rotation) {
@@ -312,6 +326,13 @@ var base = {
 
 		var new_x = Math.floor(Math.random()*(this.grid_size[0]-3)+1);
 		this._draw_piece(this._random_piece_key(), new_x, 0, 0);
+		if(this._add_piece_to_grid()) {
+			this._game_over();
+		}
+	},
+	'_game_over': function() {
+		clearInterval(this.interval);
+		$('#game_over').show();
 	},
 	'_init_grid': function() {
 		
@@ -370,7 +391,7 @@ var base = {
 					spaces_down_to_check[i] = distance_down;
 				}
 			}
-		}		
+		}
 		
 		//Detect a vertical hit
 		var hit = false;
@@ -378,7 +399,6 @@ var base = {
 			var column = this.grid[columns_to_check[i]];
 			//Hit or bottom
 			if((column[this.active_piece.y + spaces_down_to_check[i]])) {
-				//console.log(this.grid);
 				//Add piece to grid
 				var piece_shape = this.available_piece_types[this.active_piece.type][this.active_piece.rotation];
 				for(var j = 0;j<piece_shape.length;j++) {
@@ -386,8 +406,11 @@ var base = {
 				}
 				this._clear_active_piece();
 				this._new_piece();
+				
+				return true;
 			}
 		}
+		return false;
 	},
 	'_clear_active_piece': function() {
 		this.ctx.clearRect(0,0,300,480);
@@ -433,7 +456,6 @@ var base = {
 
 			//Remove Rows and Add Empty Ones Up Top
 			for(var i = 0;i<this.complete_rows.length;i++) {
-				console.log('REMOVE' + this.complete_rows[i]);
 				new_grid.remove(this.complete_rows[i]);
 				new_grid.unshift(new_row);
 			}
@@ -445,15 +467,24 @@ var base = {
 				}
 			}
 			
-			console.log(this.grid);
+			//Update score
+			this.status.lines = this.status.lines + this.complete_rows.length;
+			this.status.score = this.status.score + ((this.complete_rows.length * 10) * this.complete_rows.length);
+			
+			//Level up
+			var old_level = this.status.level;
+			this.status.level = Math.floor(this.status.lines / this.lines_per_level);
+			if(this.status.level != old_level) {				
+				var new_speed = this.initial_speed - (this.level_speed_increase * (this.status.level + 1));
+				clearInterval(this.interval);
+				this.interval = setInterval(this.progress, new_speed);
+			}
 			
 			//Reset
 			this.complete_rows = [];
 		}
 		
-		//console.log(this.grid);
 		//Check for complete rows (ignore row below bottom line)
-		//console.log(this.grid[0].length);
 		for(var i = 0;i<this.grid[0].length-1;i++) {
 			var complete = true;
 			for(var j = 0;j<this.grid.length;j++) {
@@ -488,6 +519,7 @@ $(document).ready(function() {
 	
 	$('#start').click(function() {
 		base.start();
+		$(this).hide();
 	});
 	
 	$(window).bind('keydown', function(e) {

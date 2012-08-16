@@ -1,3 +1,7 @@
 * {font-family: tahoma}
 body {text-align: center}
 #grid {margin: auto;border: 1px solid black}
+#status {float: right}
+#status div {border: 1px solid black}
+
+#game_over {color: red;font-weight: bold;display: none}
