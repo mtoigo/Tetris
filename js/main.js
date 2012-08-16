@@ -161,6 +161,14 @@ var base = {
 	},
 	'init': function() {
 		
+		//Reset anything from the last game
+		/*
+		'status': {
+			'score': 0,
+			'lines': 0,
+			'level': 0
+		},*/
+		
 		this._get_canvas();
 		this._init_grid();
 		
@@ -333,6 +341,7 @@ var base = {
 	'_game_over': function() {
 		clearInterval(this.interval);
 		$('#game_over').show();
+		$('#play_again').show();
 	},
 	'_init_grid': function() {
 		
@@ -520,6 +529,10 @@ $(document).ready(function() {
 	$('#start').click(function() {
 		base.start();
 		$(this).hide();
+	});
+	
+	$('#play_again').click(function() {
+		document.location.reload(true);
 	});
 	
 	$(window).bind('keydown', function(e) {
