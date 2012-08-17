@@ -183,17 +183,27 @@ var base = {
 	},
 	'progress': function() {
 
+		//Move down one
 		var last_active_piece_position = base.active_piece;
-
 		base._clear_active_piece();
 		base._draw_piece(last_active_piece_position.type, last_active_piece_position.x, last_active_piece_position.y+1, last_active_piece_position.rotation);
-
+		
 		//TODO - messing with normal movement
+		//console.log(base.key_hold);
 		if(base.key_hold) {
+			console.log('MOVE BY PROGRESS');
 			base.move_piece(base.key_hold);
 		}
 		
-		base._add_piece_to_grid();
+		if(!base.currently_moving_piece) {
+			if(base._add_piece_to_grid()) {
+				console.log('ADDED TO GRID FROM PROGRESS');
+			}
+		}
+		else {
+			console.log('CURRENTLY MOVING');
+		}
+		
 		base._draw_grid();
 		
 		base._update_status();
@@ -225,6 +235,8 @@ var base = {
 	},
 	'move_piece': function(direction) {
 		
+		this.currently_moving_piece = true;
+
 		var offset = -1;
 		if(direction == 'right') {
 			offset = 1;
@@ -246,7 +258,7 @@ var base = {
 		}
 		
 		//Create parallel arrays with how many blocks on the left and right to look over when moving
-		var spaces_left_to_check = [10,10,10,10];
+		var spaces_left_to_check = [0,0,0,0];
 		var spaces_right_to_check = [0,0,0,0];
 		
 		//Loop based on height looking at how far over on each side a piece is
@@ -255,20 +267,31 @@ var base = {
 			//Look through block pattern
 			var rotation = this.available_piece_types[this.active_piece.type][this.active_piece.rotation];
 			for(var j = 0;j<rotation.length;j++) {
-				var distance_right = rotation[j][0] + 1;
-				var distance_left = rotation[j][0] + 1;
+				
+				//var distance_left = rotation[j][0] + 1;
 				
 				//Set spaces right to check
+				var distance_right = rotation[j][0] + 1;
 				if(rotation[j][1]==i && distance_right > spaces_right_to_check[i]) {
 					spaces_right_to_check[i] = distance_right;
 				}
 				
 				//Set spaces left to check
-				if(rotation[j][1]==i && distance_left < spaces_left_to_check[i]) {
-					spaces_left_to_check[i] = distance_left;
+				var distance_left = rotation[j][0];
+				if(rotation[j][1]==i) {
+					if(distance_left==0) {
+						spaces_left_to_check[i] = 1;
+					}
+					
 				}
+				/*
+				if(rotation[j][1]==i && distance_left < spaces_left_to_check[i]) {
+					spaces_left_to_check[i] = 1 - distance_left;
+				}*/
+				
 			}
 		}
+		console.log(spaces_left_to_check);
 
 		//Detect blocks in the way of our move
 		var valid = true;
@@ -282,7 +305,11 @@ var base = {
 				}
 				else {
 					if(this.active_piece.x - spaces_left_to_check[i] > 0) {
+						//LIKELY THIS LINE IS THE BUG ([this.active_piece.x - spaces_left_to_check[i]])
+						console.log((this.active_piece.x - spaces_left_to_check[i]) + ',' + (this.active_piece.y + i));
+						//console.log(this.grid[this.active_piece.x - spaces_left_to_check[i]][this.active_piece.y + i]);
 						if(this.grid[this.active_piece.x - spaces_left_to_check[i]][this.active_piece.y + i]) {
+							//console.log('SETTING INVALID block at: ' + this.active_piece.x - spaces_left_to_check[i] + ',' + this.active_piece.y + i);
 							valid = false;
 						}
 					}
@@ -292,12 +319,21 @@ var base = {
 
 		//Legal Move
 		if(valid && in_grid) {
+			//console.log('MOVING '+ this.active_piece.y);
 			var last_active_piece_position = base.active_piece;
 			base._clear_active_piece();
 			this._draw_piece(last_active_piece_position.type, last_active_piece_position.x + offset, last_active_piece_position.y, last_active_piece_position.rotation);
+			
+			if(this._add_piece_to_grid()) {
+				console.log('ADDED TO GRID');
+			}
+		}
+		else {
+			//console.log('INVALID MOVE ' + this.active_piece.y);
 		}
 		
-		this._add_piece_to_grid();
+		this.currently_moving_piece = false;
+
 		this._draw_grid();
 	},
 	'_piece_dimensions': function(type, rotation) {
@@ -323,7 +359,7 @@ var base = {
 		this.ctx = document.getElementById('grid').getContext('2d');
 	},
 	'_random_piece_key': function() {
-		
+
 		var keys = []
 		for(var key in this.available_piece_types) {
 			keys.push(key);
@@ -543,11 +579,13 @@ $(document).ready(function() {
 			break;
 			//Left
 			case 37:
+				console.log('MOVE BY KEY PRESS');
 				base.move_piece('left');
 				base.key_hold = 'left';
 			break;
 			//Right
 			case 39:
+				console.log('MOVE BY KEY PRESS');
 				base.move_piece('right');
 				base.key_hold = 'right';
 			break;
