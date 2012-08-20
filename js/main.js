@@ -5,13 +5,20 @@ Array.prototype.remove = function(from, to) {
   this.length = from < 0 ? this.length + from : from;
   return this.push.apply(this, rest);
 };
-
+//Random element from an array
+Array.prototype.random = function() {
+	return this[Math.floor(Math.random()*this.length)]
+}
 
 var base = {
 	'colors': {
-		'red': 'rgb(200,0,0)',
-		'blue': 'rgb(17, 100, 204)',
-		'green': 'rgb(9, 150, 16)'
+		//Red, green, purple, marine
+		'pieces': ['rgb(200,0,0)', 'rgb(17, 100, 204)', 'rgb(134, 12, 211)', 'rgb(20, 135, 152)'],
+		'complete_line': 'rgb(9, 150, 16)',
+		'block_border': {
+			'color': 'rgb(0, 0, 0)',
+			'width': 1
+		}
 	},
 	'grid': {
 		'tracking': [],
@@ -27,12 +34,14 @@ var base = {
 	'key_hold': false,
 	'ctx': null,
 	'complete_rows': [],
+	'next_piece': false,
 	'active_piece': {
 		'info': {
 			'type': false,
 			'rotation': false,
 			'x': false,
 			'y': false,
+			'color': false
 		},
 		'dimensions': function(rotation) {
 			if(!rotation) {
@@ -120,6 +129,7 @@ var base = {
 	'progress': function() {
 
 		//Move our active piece down
+		console.log(this.active_piece);
 		var last_active_piece_position = this.active_piece.info;
 		this._clear_canvas();
 		this._draw_piece(last_active_piece_position.type, last_active_piece_position.x, last_active_piece_position.y+1, last_active_piece_position.rotation);
@@ -248,11 +258,12 @@ var base = {
 		for(var key in this.available_piece_types) {
 			keys.push(key);
 		}
-		return keys[Math.floor(Math.random()*keys.length)];
+		return keys.random();
 	},
 	'_new_piece': function() {
 
 		var new_x = Math.floor(Math.random()*(this.grid.size[0]-3)+1);
+		this.active_piece.info.color = this.colors.pieces.random();
 		this._draw_piece(this._random_piece_key(), new_x, 0, 0);
 		if(this._add_piece_to_grid()) {
 			this._game_over();
@@ -265,15 +276,14 @@ var base = {
 	},
 	'_draw_grid': function() {
 
-		this.ctx.fillStyle = this.colors.blue;
-
 		for(var i = 0;i<this.grid.tracking.length;i++) {
 			for(var j = 0;j<this.grid.tracking[i].length;j++) {
-				
-				this.ctx.strokeStyle = this.colors.red
-				this.ctx.strokeRect(i*this.grid.square_size, j*this.grid.square_size, this.grid.square_size, this.grid.square_size);
-				
 				if(this.grid.tracking[i][j]) {
+					this.ctx.strokeStyle = this.colors.block_border.color;
+					this.ctx.lineWidth = this.colors.block_border.width;
+					this.ctx.strokeRect(i*this.grid.square_size, j*this.grid.square_size, this.grid.square_size, this.grid.square_size);
+					
+					this.ctx.fillStyle = this.grid.tracking[i][j];
 					this.ctx.fillRect(i*this.grid.square_size, j*this.grid.square_size, this.grid.square_size, this.grid.square_size);
 				}
 			}
@@ -316,7 +326,7 @@ var base = {
 				//Add piece to grid
 				var piece_shape = this.available_piece_types[this.active_piece.info.type][this.active_piece.info.rotation];
 				for(var j = 0;j<piece_shape.length;j++) {
-					this.grid.tracking[this.active_piece.info.x + piece_shape[j][0]][this.active_piece.info.y + piece_shape[j][1]] = true;
+					this.grid.tracking[this.active_piece.info.x + piece_shape[j][0]][this.active_piece.info.y + piece_shape[j][1]] = this.active_piece.info.color;
 				}
 				
 				this._clear_canvas();
@@ -332,18 +342,29 @@ var base = {
 	},
 	'_draw_piece': function(piece_type, x_grid_offset, y_grid_offset, rotation) {
 		
-		this.ctx.fillStyle = this.colors.red;
+		this.ctx.fillStyle = this.active_piece.info.color;
 		
 		//Track our piece
-		this.active_piece.info = {'type': piece_type, 'x': x_grid_offset, 'y': y_grid_offset, 'rotation': rotation};
+		this.active_piece.info = {'type': piece_type, 'x': x_grid_offset, 'y': y_grid_offset, 'rotation': rotation, 'color': this.ctx.fillStyle};
 		
 		//Defaults
 		var x_grid_offset = typeof x_grid_offset !== 'undefined' ? x_grid_offset : 0;
 		var y_grid_offset = typeof y_grid_offset !== 'undefined' ? y_grid_offset : 0;
 
 		for(var i = 0;i<this.available_piece_types[piece_type][rotation].length;i++) {
+			
 			var square = this.available_piece_types[piece_type][rotation][i];
-			this.ctx.fillRect(square[0]*this.grid.square_size + this.grid.square_size*x_grid_offset, square[1]*this.grid.square_size + this.grid.square_size*y_grid_offset, this.grid.square_size, this.grid.square_size);
+			var x_start = square[0]*this.grid.square_size + this.grid.square_size*x_grid_offset;
+			var y_start = square[1]*this.grid.square_size + this.grid.square_size*y_grid_offset;
+			var size = this.grid.square_size;
+			
+			//Fill
+			this.ctx.fillRect(x_start, y_start, size, size);
+			
+			//Stroke
+			this.ctx.strokeStyle = this.colors.block_border.color;
+			this.ctx.lineWidth = this.colors.block_border.width;
+			this.ctx.strokeRect(x_start, y_start, size, size);
 		}
 	},
 	'_check_for_complete_rows': function() {
@@ -426,7 +447,7 @@ var base = {
 			}
 
 			//Light up row
-			this.ctx.fillStyle = this.colors.green;
+			this.ctx.fillStyle = this.colors.complete_line;
 			this.ctx.fillRect(0, this.complete_rows[i]*this.grid.square_size, this.grid.square_size*this.grid.size[0], this.grid.square_size);
 		}
 		
