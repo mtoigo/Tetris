@@ -239,18 +239,30 @@ var base = {
 		
 		//Check for overlap with other blocks
 		var rows_to_check = this.active_piece.rows(next_rotation);
-		var columns_to_check = this.active_piece.columns(next_rotation);
 		var spaces_left_to_check = this.active_piece.border(next_rotation).left;
 		var spaces_right_to_check = this.active_piece.border(next_rotation).right;
 		var spaces_down_to_check = this.active_piece.border(next_rotation).bottom;
-				
+		
+		//Check for overlap with existing pieces
 		var valid = true;
-		//Check overlap on left and right
-		for(var i = 0;i<columns_to_check.length;i++) {
-
-			//Check left
-			if(this.grid.tracking[columns_to_check[i]][this.active_piece.info.y]) {
-				valid = false;
+		for(var i = 0;i<rows_to_check.length;i++) {
+			//Right
+			for(var j = 0;j<spaces_right_to_check[i];j++) {
+				if(this.grid.tracking[this.active_piece.info.x + j][this.active_piece.info.y + i]) {
+					valid = false;
+				}
+			}
+			//Left
+			for(var j = 0;j<spaces_left_to_check[i];j++) {
+				if(this.grid.tracking[this.active_piece.info.x - j][this.active_piece.info.y + i]) {
+					valid = false;
+				}
+			}
+			//Below
+			for(var j = 1;j<spaces_down_to_check[i]+1;j++) {
+				if(this.grid.tracking[this.active_piece.info.x][this.active_piece.info.y + j]) {
+					valid = false;
+				}
 			}
 		}
 		
@@ -324,7 +336,7 @@ var base = {
 		this._draw_grid();
 	},
 	'_random_piece_key': function() {
-
+		return 'j';
 		var keys = []
 		for(var key in this.available_piece_types) {
 			keys.push(key);
