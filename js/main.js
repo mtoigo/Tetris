@@ -129,7 +129,7 @@ var base = {
 	'progress': function() {
 
 		//Move our active piece down
-		console.log(this.active_piece);
+		console.log(this);
 		var last_active_piece_position = this.active_piece.info;
 		this._clear_canvas();
 		this._draw_piece(last_active_piece_position.type, last_active_piece_position.x, last_active_piece_position.y+1, last_active_piece_position.rotation);
@@ -412,7 +412,7 @@ var base = {
 			if(this.status.level != old_level) {				
 				var new_speed = this.settings.initial_speed - (this.settings.level_speed_increase * (this.status.level + 1));
 				clearInterval(this.interval);
-				this.interval = setInterval(this.progress, new_speed);
+				this.interval = setInterval($.proxy(this.progress, base), new_speed);
 			}
 			
 			//Update Status
