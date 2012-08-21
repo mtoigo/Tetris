@@ -44,7 +44,7 @@ var base = {
 			'color': false
 		},
 		'dimensions': function(rotation) {
-			if(!rotation) {
+			if(rotation==undefined) {
 				rotation = this.info.rotation;
 			}
 
@@ -63,6 +63,84 @@ var base = {
 			}
 
 			return dimensions;
+		},
+		'columns': function(rotation) {
+			
+			if(rotation==undefined) {
+				rotation = this.info.rotation;
+			}
+			
+			var columns_to_check = [];
+			var c = this.info.x;
+			while(c < (this.info.x + this.dimensions(rotation).x)) {
+				columns_to_check.push(c);
+				c++;
+			}
+			return columns_to_check
+		},
+		'rows': function(rotation) {
+			
+			if(rotation==undefined) {
+				rotation = this.info.rotation;
+			}
+
+			var rows_to_check = [];
+			var c = this.info.y;
+			while(c < (this.info.y + this.dimensions(rotation).y)) {
+				rows_to_check.push(c);
+				c++;
+			}
+			return rows_to_check;
+		},
+		'border': function(rotation) {
+			
+			if(rotation==undefined) {
+				rotation = this.info.rotation;
+			}
+			
+			//Create parallel arrays with how many blocks on the left and right to look over when moving
+			borders = {
+				'left': [0, 0, 0, 0],
+				'right': [0, 0, 0, 0],
+				'bottom': [0, 0, 0, 0]
+			};
+			
+			var blocks= base.available_piece_types[this.info.type][rotation];
+
+			//Left and Right
+			for(var i = 0;i<this.dimensions().y;i++) {
+				//Look through block pattern
+				for(var j = 0;j<blocks.length;j++) {
+
+					//Set spaces right to check
+					var distance_right = blocks[j][0] + 1;
+					if(blocks[j][1]==i && distance_right > borders.right[i]) {
+						borders.right[i] = distance_right;
+					}
+
+					//Set spaces left to check
+					var distance_left = blocks[j][0];
+					if(blocks[j][1]==i) {
+						if(distance_left==0) {
+							borders.left[i] = 1;
+						}
+					}
+				}
+			}
+			
+			//Loop based on width looking at how many blocks down each is
+			for(var i = 0;i<this.dimensions().x;i++) {
+
+				//Look through block pattern
+				for(var j = 0;j<blocks.length;j++) {
+					var distance_down = blocks[j][1]+1;
+					if(blocks[j][0]==i && distance_down > borders.bottom[i]) {
+						borders.bottom[i] = distance_down;
+					}
+				}
+			}
+			
+			return borders; 
 		}
 	},
 	'status': {
@@ -129,7 +207,6 @@ var base = {
 	'progress': function() {
 
 		//Move our active piece down
-		console.log(this);
 		var last_active_piece_position = this.active_piece.info;
 		this._clear_canvas();
 		this._draw_piece(last_active_piece_position.type, last_active_piece_position.x, last_active_piece_position.y+1, last_active_piece_position.rotation);
@@ -151,21 +228,44 @@ var base = {
 			next_rotation = 0;
 		}
 		
-		//Case where a rotation will put a piece off screen
-		var new_x = this.active_piece.info.x;
-		if(this.active_piece.dimensions(next_rotation).x + this.active_piece.info.x > this.grid.size[0]) {
-			new_x = new_x - 1;
+		//Case where a rotation will put a piece off screen, move it left until we're good
+		var x_offset = 0;
+		while((this.active_piece.dimensions(next_rotation).x + this.active_piece.info.x) - x_offset > this.grid.size[0]) {
+			x_offset = x_offset + 1;
+		}
+		var old_x = this.active_piece.info.x;
+		var new_x = this.active_piece.info.x - x_offset;
+		this.active_piece.info.x = new_x; //TODO - Will have to undo if the move is illegal
+		
+		//Check for overlap with other blocks
+		var rows_to_check = this.active_piece.rows(next_rotation);
+		var columns_to_check = this.active_piece.columns(next_rotation);
+		var spaces_left_to_check = this.active_piece.border(next_rotation).left;
+		var spaces_right_to_check = this.active_piece.border(next_rotation).right;
+		var spaces_down_to_check = this.active_piece.border(next_rotation).bottom;
+				
+		var valid = true;
+		//Check overlap on left and right
+		for(var i = 0;i<columns_to_check.length;i++) {
+
+			//Check left
+			if(this.grid.tracking[columns_to_check[i]][this.active_piece.info.y]) {
+				valid = false;
+			}
 		}
 		
-		//TODO - Code to check if a rotation colides with the grid
-		
-		//Rotate
-		var last_active_piece_position = this.active_piece.info;
-		this._clear_canvas();
-		this._draw_piece(last_active_piece_position.type, new_x, last_active_piece_position.y, next_rotation);
+		if(valid) {
+			//Rotate
+			var last_active_piece_position = this.active_piece.info;
+			this._clear_canvas();
+			this._draw_piece(last_active_piece_position.type, new_x, last_active_piece_position.y, next_rotation);
 
-		this._add_piece_to_grid();
-		this._draw_grid();
+			this._add_piece_to_grid();
+			this._draw_grid();
+		}
+		else {
+			this.active_piece.info.x = old_x;
+		}
 	},
 	'move_piece': function(direction) {
 		
@@ -183,41 +283,12 @@ var base = {
 			in_grid = true;
 		}
 		
-		//Determine rows to check
-		var piece_dimensions = this.active_piece.dimensions();
-		var rows_to_check = [];
-		var c = this.active_piece.info.y;
-		while(c < (this.active_piece.info.y + piece_dimensions.y)) {
-			rows_to_check.push(c);
-			c++;
-		}
+		//Determine grid rows to check
+		var rows_to_check = this.active_piece.rows();
 		
 		//Create parallel arrays with how many blocks on the left and right to look over when moving
-		var spaces_left_to_check = [0,0,0,0];
-		var spaces_right_to_check = [0,0,0,0];
-		
-		//Loop based on height looking at how far over on each side a piece is
-		for(var i = 0;i<piece_dimensions.y;i++) {
-			
-			//Look through block pattern
-			var rotation = this.available_piece_types[this.active_piece.info.type][this.active_piece.info.rotation];
-			for(var j = 0;j<rotation.length;j++) {
-								
-				//Set spaces right to check
-				var distance_right = rotation[j][0] + 1;
-				if(rotation[j][1]==i && distance_right > spaces_right_to_check[i]) {
-					spaces_right_to_check[i] = distance_right;
-				}
-				
-				//Set spaces left to check
-				var distance_left = rotation[j][0];
-				if(rotation[j][1]==i) {
-					if(distance_left==0) {
-						spaces_left_to_check[i] = 1;
-					}
-				}
-			}
-		}
+		var spaces_left_to_check = this.active_piece.border().left;
+		var spaces_right_to_check = this.active_piece.border().right;
 
 		//Detect blocks in the way of our move
 		var valid = true;
@@ -295,27 +366,8 @@ var base = {
 		var piece_dimensions = this.active_piece.dimensions();
 
 		//Determine columns to check
-		var columns_to_check = [];
-		var c = this.active_piece.info.x;
-		while(c < (this.active_piece.info.x + piece_dimensions.x)) {
-			columns_to_check.push(c);
-			c++;
-		}
-		
-		//Create parallel array with how many blocks down to count on each column based on it shape
-		var spaces_down_to_check = [0,0,0];
-		//Loop based on width looking at how many blocks down each is
-		for(var i = 0;i<piece_dimensions.x;i++) {
-			
-			//Look through block pattern
-			var rotation = this.available_piece_types[this.active_piece.info.type][this.active_piece.info.rotation];
-			for(var j = 0;j<rotation.length;j++) {
-				var distance_down = rotation[j][1]+1;
-				if(rotation[j][0]==i && distance_down > spaces_down_to_check[i]) {
-					spaces_down_to_check[i] = distance_down;
-				}
-			}
-		}
+		var columns_to_check = this.active_piece.columns();
+		var spaces_down_to_check = this.active_piece.border().bottom;
 		
 		//Detect a vertical hit
 		var hit = false;
