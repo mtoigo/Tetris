@@ -1,10 +1,12 @@
 * {font-family: tahoma}
-body {text-align: center;margin: 20px}
+body {text-align: center;margin: 10px 20px}
 #grid {margin: auto;border: 1px solid black}
 .button {color: #ffffff;padding: 10px;text-align: center;font-weight: bold;margin: auto auto 20px auto;background: #086ee1;box-shadow: 2px 2px 2px #bebebe;border: 1px solid #145298}
 #directions{float: left;text-align: left}
+#next {float: right}
 #status {float: right}
 #status div {border: 1px solid black}
 
 #game_over {color: red;font-weight: bold;display: none;font-size: 16pt}
 #play_again {display: none}
+

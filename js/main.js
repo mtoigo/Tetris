@@ -198,6 +198,12 @@ var base = {
 				}
 			}
 		}
+		
+		//Next piece
+		this.next_piece = {
+			'shape': this._random_piece_key(),
+			'color': this.colors.pieces.random()
+		};
 	},
 	'start': function () {
 		
@@ -336,7 +342,7 @@ var base = {
 		this._draw_grid();
 	},
 	'_random_piece_key': function() {
-		return 'j';
+
 		var keys = []
 		for(var key in this.available_piece_types) {
 			keys.push(key);
@@ -344,10 +350,28 @@ var base = {
 		return keys.random();
 	},
 	'_new_piece': function() {
-
+		
 		var new_x = Math.floor(Math.random()*(this.grid.size[0]-3)+1);
-		this.active_piece.info.color = this.colors.pieces.random();
-		this._draw_piece(this._random_piece_key(), new_x, 0, 0);
+		this.active_piece.info.color = this.next_piece.color;
+		this._draw_piece(this.next_piece.shape, new_x, 0, 0);
+		
+		this.next_piece = {
+			'shape': this._random_piece_key(),
+			'color': this.colors.pieces.random()
+		};
+		
+		//Draw our next piece
+		var next_ctx = document.getElementById('next').getContext('2d');
+		next_ctx.clearRect(0, 0, 200, 200);
+		var blocks = this.available_piece_types[this.next_piece.shape][0];
+		for(var i = 0; i < blocks.length ; i++) {
+			next_ctx.strokeStyle = this.colors.block_border.color;
+			next_ctx.lineWidth = this.colors.block_border.width;
+			next_ctx.strokeRect(blocks[i][0]*this.grid.square_size, blocks[i][1]*this.grid.square_size, this.grid.square_size, this.grid.square_size);
+			next_ctx.fillStyle = this.next_piece.color;
+			next_ctx.fillRect(blocks[i][0]*this.grid.square_size, blocks[i][1]*this.grid.square_size, this.grid.square_size, this.grid.square_size);
+		}
+		
 		if(this._add_piece_to_grid()) {
 			this._game_over();
 		}
