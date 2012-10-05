@@ -13,7 +13,8 @@ Array.prototype.random = function() {
 var base = {
 	'colors': {
 		//Red, green, purple, marine
-		'pieces': ['rgb(200,0,0)', 'rgb(17, 100, 204)', 'rgb(134, 12, 211)', 'rgb(20, 135, 152)'],
+		'pieces': ['rgb(200, 0, 0)', 'rgb(17, 100, 204)', 'rgb(134, 12, 211)', 'rgb(20, 135, 152)'],
+		'added_line': 'rgb(106, 106, 106)',
 		'complete_line': 'rgb(9, 150, 16)',
 		'block_border': {
 			'color': 'rgb(0, 0, 0)',
@@ -455,21 +456,34 @@ var base = {
 			this.ctx.strokeRect(x_start, y_start, size, size);
 		}
 	},
+	
+	'_convert_grid': function() {
+		//Transform the grid to have rows before columns (y before x)
+		var new_grid = [];
+		for(var i = 0;i<this.grid.tracking[0].length;i++) {
+			var new_row = []
+			for(var j = 0;j<this.grid.tracking.length;j++) {
+				
+				new_row.push(this.grid.tracking[j][i]);
+			}				
+			new_grid.push(new_row);
+		}
+		return new_grid;
+	},
+	'_convert_grid_back': function(converted_grid) {
+		//Convert back to normal grid (x before y)
+		for(var i = 0;i < converted_grid[0].length;i++) {
+			for(var j = 0;j < converted_grid.length;j++) {
+				this.grid.tracking[i][j] = converted_grid[j][i];
+			}
+		}
+	},
 	'_check_for_complete_rows': function() {
 
 		//Remove complete rows
 		if(this.complete_rows.length > 0) {
 
-			//Transform the grid to have rows before columns (y before x)
-			var new_grid = [];
-			for(var i = 0;i<this.grid.tracking[0].length;i++) {
-				var new_row = []
-				for(var j = 0;j<this.grid.tracking.length;j++) {
-					
-					new_row.push(this.grid.tracking[j][i]);
-				}				
-				new_grid.push(new_row);
-			}
+			var new_grid = this._convert_grid();
 			
 			//Fresh Empty Row
 			var new_row = []
@@ -482,13 +496,8 @@ var base = {
 				new_grid.remove(this.complete_rows[i]);
 				new_grid.unshift(new_row);
 			}
-	
-			//Convert back to normal grid (x before y)
-			for(var i = 0;i < new_grid[0].length;i++) {
-				for(var j = 0;j < new_grid.length;j++) {
-					this.grid.tracking[i][j] = new_grid[j][i];
-				}
-			}
+			
+			this._convert_grid_back(new_grid); 
 			
 			//Update score
 			this.status.lines = this.status.lines + this.complete_rows.length;
@@ -537,8 +546,31 @@ var base = {
 			//Light up row
 			this.ctx.fillStyle = this.colors.complete_line;
 			this.ctx.fillRect(0, this.complete_rows[i]*this.grid.square_size, this.grid.square_size*this.grid.size[0], this.grid.square_size);
+		}		
+	},
+	'add_row': function() {
+		var converted_grid = this._convert_grid();
+		
+		//Create a new row with one piece missing
+		var new_row = [];
+		var empty_block = Math.floor(Math.random()*this.grid.size[0]);
+		for(var i = 0;i<this.grid.size[0];i++){
+			if(i==empty_block) {
+				new_row[i] = false;
+			}
+			else {
+				new_row[i] = this.colors.added_line;
+			}
 		}
 		
+		//Add our new row
+		var existing_grid = converted_grid.slice(1, this.grid.size[1]);
+		var bottom = converted_grid[this.grid.size[1]];
+		var new_grid = existing_grid;
+		new_grid.push(new_row);
+		new_grid.push(bottom);
+		
+		this._convert_grid_back(new_grid);
 	}
 }
 
@@ -571,6 +603,7 @@ $(document).ready(function() {
 			//Down
 			case 40:
 				base.progress();
+			break;
 		}
 	});
 
